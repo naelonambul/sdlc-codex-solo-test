@@ -10,6 +10,51 @@
       "timeout_seconds": 600,
       "paths": ["scripts/**", "checks.json", "changes/**", ".github/**", ".claude/**", ".agents/**", "AGENTS.md", "intent.md", "spec.md", ".gitattributes"],
       "requires": ["python3", "git"]
+    },
+    {
+      "id": "daylist-compile",
+      "group": "core",
+      "argv": ["python3", "-m", "py_compile", "daylist.py"],
+      "cwd": ".",
+      "timeout_seconds": 60,
+      "paths": ["daylist.py", "tests/**"],
+      "requires": ["python3", "git"]
+    },
+    {
+      "id": "daylist-tests",
+      "group": "core",
+      "argv": ["python3", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "cwd": ".",
+      "timeout_seconds": 600,
+      "paths": ["daylist.py", "tests/**"],
+      "requires": ["python3", "git"]
+    },
+    {
+      "id": "daylist-ruff-lint",
+      "group": "python-quality",
+      "argv": ["ruff", "check", "daylist.py", "tests"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "paths": ["daylist.py", "tests/**", "pyproject.toml", "requirements-dev.txt", "checks.json"],
+      "requires": ["ruff"]
+    },
+    {
+      "id": "daylist-ruff-format",
+      "group": "python-quality",
+      "argv": ["ruff", "format", "--check", "daylist.py", "tests"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "paths": ["daylist.py", "tests/**", "pyproject.toml", "requirements-dev.txt", "checks.json"],
+      "requires": ["ruff"]
+    },
+    {
+      "id": "daylist-mypy",
+      "group": "python-quality",
+      "argv": ["mypy", "--strict", "daylist.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "paths": ["daylist.py", "tests/**", "pyproject.toml", "requirements-dev.txt", "checks.json"],
+      "requires": ["mypy"]
     }
   ]
 }

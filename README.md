@@ -4,6 +4,21 @@ A small, agent-neutral starter repository for an AI-native software development 
 
 This template turns the repository itself into the shared control plane for planning, implementation, verification, and review. It is inspired by the AI-Native SDLC playbook and generalizes the artifact-driven workflow so it can be used with different coding agents.
 
+## Daylist CLI
+
+Daylist is a local task checklist for Python 3.9 or newer. It uses only the Python standard library at runtime and stores tasks in `~/.daylist/tasks.json` by default.
+
+```sh
+python3 daylist.py add "Buy tea"
+python3 daylist.py list
+python3 daylist.py done 1
+python3 daylist.py remove 1
+```
+
+Choose another list by placing `--data-file PATH` before the command, such as `python3 daylist.py --data-file ./work.json list`. The path can be relative to the current directory or start with `~`. Daylist runs offline and supports one process at a time writing a given file.
+
+For development, install the pinned tools with `python3 -m pip install -r requirements-dev.txt`. Run `python3 -m unittest discover -s tests -v`, `ruff check daylist.py tests`, `ruff format --check daylist.py tests`, and `mypy --strict daylist.py`.
+
 ## Core workflow
 
 ```text
