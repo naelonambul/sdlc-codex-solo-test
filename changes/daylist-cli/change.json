@@ -12,6 +12,7 @@
     "daylist.py",
     "tests/**",
     "pyproject.toml",
+    "requirements-dev.txt",
     "checks.json",
     ".github/workflows/repository.yml",
     "README.md",
@@ -25,6 +26,13 @@
       "by": "naelonambul",
       "at": "2026-10-30T15:31:20Z",
       "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest f4d0abfd"
+    },
+    {
+      "artifact": "spec.md",
+      "sha256": "sha256:6a3519d92527c5e8eba69a313b23b477d7590a3c46e465ecb9c8fcfca26f5b20",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:33:48Z",
+      "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest 6a3519d9"
     }
   ]
 }
