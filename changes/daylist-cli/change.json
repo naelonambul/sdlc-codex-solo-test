@@ -33,6 +33,14 @@
       "by": "naelonambul",
       "at": "2026-10-30T15:33:48Z",
       "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest 6a3519d9"
+    },
+    {
+      "artifact": "plan.md",
+      "sha256": "sha256:9d93f48db248799e733d297ab2dfb6698892b3fa30643385881e5563a3d162c5",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:41:24Z",
+      "write_scope_sha256": "sha256:1f3827960a9bc586ba4691db5b5a22c754cb6d413c41c208b65bdbc62011dd7e",
+      "note": "Owner delegated test-repo approval to the supervising agent in chat; digest 9d93f48d reviewed by supervising agent"
     }
   ]
 }
