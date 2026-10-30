@@ -15,7 +15,7 @@ python3 daylist.py done 1
 python3 daylist.py remove 1
 ```
 
-Choose another list by placing `--data-file PATH` before the command, such as `python3 daylist.py --data-file ./work.json list`. The path can be relative to the current directory or start with `~`. Daylist runs offline and supports one process at a time writing a given file.
+Choose another list by placing `--data-file PATH` before the command, such as `python3 daylist.py --data-file ./work.json list`. The path can be relative to the current directory or start with `~`. IDs increase monotonically and are not reused after removal; repeating `done ID` succeeds without changing the task. Daylist runs offline and supports one process at a time writing a given file.
 
 For development, install the pinned tools with `python3 -m pip install -r requirements-dev.txt`. Run `python3 -m unittest discover -s tests -v`, `ruff check daylist.py tests`, `ruff format --check daylist.py tests`, and `mypy --strict daylist.py`.
 
