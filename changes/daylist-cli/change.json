@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "daylist-cli",
+  "kind": "product-init",
+  "title": "Establish Daylist, a local task-list CLI",
+  "base": {
+    "ref": "main",
+    "commit": "561b889bddad3b621c426060d8bd97b09bb553a5"
+  },
+  "baseline": {},
+  "write_scope": [
+    "daylist.py",
+    "tests/**",
+    "pyproject.toml",
+    "requirements-dev.txt",
+    "checks.json",
+    ".github/workflows/repository.yml",
+    "README.md",
+    "intent.md",
+    "spec.md"
+  ],
+  "approvals": [
+    {
+      "artifact": "intent.md",
+      "sha256": "sha256:f4d0abfd6f462506d317f340031c30f037c0b7cdf18e624b74b51e90ddc23bc1",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:31:20Z",
+      "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest f4d0abfd"
+    },
+    {
+      "artifact": "spec.md",
+      "sha256": "sha256:6a3519d92527c5e8eba69a313b23b477d7590a3c46e465ecb9c8fcfca26f5b20",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:33:48Z",
+      "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest 6a3519d9"
+    },
+    {
+      "artifact": "plan.md",
+      "sha256": "sha256:9d93f48db248799e733d297ab2dfb6698892b3fa30643385881e5563a3d162c5",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:41:24Z",
+      "write_scope_sha256": "sha256:1f3827960a9bc586ba4691db5b5a22c754cb6d413c41c208b65bdbc62011dd7e",
+      "note": "Owner delegated test-repo approval to the supervising agent in chat; digest 9d93f48d reviewed by supervising agent"
+    }
+  ]
+}
