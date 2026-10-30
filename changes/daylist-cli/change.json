@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "daylist-cli",
+  "kind": "product-init",
+  "title": "Establish Daylist, a local task-list CLI",
+  "base": {
+    "ref": "main",
+    "commit": "561b889bddad3b621c426060d8bd97b09bb553a5"
+  },
+  "baseline": {},
+  "write_scope": [
+    "daylist.py",
+    "tests/**",
+    "pyproject.toml",
+    "checks.json",
+    ".github/workflows/repository.yml",
+    "README.md",
+    "intent.md",
+    "spec.md"
+  ],
+  "approvals": [
+    {
+      "artifact": "intent.md",
+      "sha256": "sha256:f4d0abfd6f462506d317f340031c30f037c0b7cdf18e624b74b51e90ddc23bc1",
+      "by": "naelonambul",
+      "at": "2026-10-30T15:31:20Z",
+      "note": "Owner approved in chat (\"\uc2b9\uc778\") after reviewing digest f4d0abfd"
+    }
+  ]
+}
