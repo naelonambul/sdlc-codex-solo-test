@@ -73,7 +73,7 @@ The ordered path for every change, with what `python3 scripts/repo.py status --c
 
 | Step | Action | Expected status |
 |---|---|---|
-| 1 | Create the packet; draft artifacts in chain order | `stage=<first unapproved artifact>`, `readiness=blocked` |
+| 1 | Branch from the updated baseline; create the packet; draft artifacts in chain order | `stage=<first unapproved artifact>`, `readiness=blocked` |
 | 2 | The owner approves each artifact in order with `repo.py approve`; the agent commits and pushes the claim | after the last: `stage=implementation readiness=ready` |
 | 3 | Implement inside `write_scope`; run `repo.py verify --change <id>`, and `--full` before closing | unchanged |
 | 4 | Merge accepted change-local `intent.md`/`spec.md` into the root; verify again | unchanged |
@@ -85,14 +85,10 @@ The ordered path for every change, with what `python3 scripts/repo.py status --c
 
 Evidence rules:
 
-- **Cite only existing evidence.** A closure cites only evidence that exists when it is written, normally the local `verify` evidence from step 4. `close` refuses unless at least one reference is a `repo.py verify --change <id>` evidence file from a full run: complete, every check in `checks.json` `passed`, HEAD as its `source.commit`, and a `source.tree_sha256` that matches the current files. Any edit after `verify` needs a new `verify`. The digest leaves out `.evidence/` and the change's own `closure.json`, so writing the closure does not invalidate its evidence. It stops stale evidence, not forgery; CI and owner review stay the gates. Other references may accompany it. It never cites the CI run of its own pull request, which cannot exist yet.
+- **Cite only existing evidence.** A closure cites only evidence that exists when it is written, normally the local `verify` evidence from step 4. `close` refuses unless at least one reference is a `repo.py verify --change <id>` evidence file from a full run: complete, every check in `checks.json` `passed`, HEAD as its `source.commit`, and a `source.tree_sha256` that matches the current files. Any edit after `verify` needs a new `verify`. The digest covers paths, modes and content. It leaves out `.evidence/` and the change's own `closure.json`, so writing the closure does not invalidate its evidence. `close` records it as `tree_sha256`, and `status` reports `closure-stale` when a candidate's files no longer match, including on a branch that is behind the baseline, because CI checks the pull request merged with its base. It stops stale evidence, not forgery; CI and owner review stay the gates. Other references may accompany it. It never cites the CI run of its own pull request, which cannot exist yet.
 - **CI results go in the pull request.** Record CI results in the pull request description or a comment, not in `closure.json`. The required `summary` check is the merge gate.
-- **Fixes after closure.** If CI or review needs another commit after the closure exists, that same commit:
-  - re-runs local verification;
-  - replaces the closure's `evidence` with the new references;
-  - recomputes `packet_sha256` only if a packet file changed, and `baseline` only if a carried root artifact changed.
-
-  `packet_sha256` excludes `closure.json`, so updating `evidence` never changes it. No commit is made only to cite a CI run.
+- **Fixes after closure.** If CI or review needs another commit after the closure exists, work in this order, so one commit holds the fix and its closure: edit, `repo.py verify --change <id> --full`, `repo.py close <id> --evidence <ref>`, commit. `close` rewrites `evidence`, `tree_sha256`, and any changed `packet_sha256` or `baseline`. No commit is made only to cite a CI run.
+- **Revisions after closure.** If review needs a change to an artifact or `write_scope` before merge: revise it, have the owner approve it and then every later artifact in chain order, replace the root with a changed carried artifact, then run `verify --change <id> --full`, `close`, and commit. Until `close` runs again, the closure is invalid and CI fails.
 - **After merge.** The packet is frozen. Record follow-up work as a new change.
 
 ## Closure
@@ -100,20 +96,20 @@ Evidence rules:
 To close a change:
 
 1. Merge accepted change-local `intent.md` and `spec.md` into the root by replacing the root file with the packet copy.
-2. Run `python3 scripts/repo.py close <id> --evidence <ref>...`. It computes the digests and refuses while an approval is missing or a carried artifact is not yet merged into the root. An evidence reference that is an existing file (normally `.evidence/<run>/evidence.json`) is recorded with its sha256, so a reviewer can match it against the uploaded CI evidence. The result:
+2. Run `python3 scripts/repo.py close <id> --evidence <ref>...`. It computes the digests and refuses while an approval is missing or a carried artifact is not yet merged into the root. An evidence reference that is an existing file (normally `.evidence/<run>/evidence.json`) is recorded with its sha256 as the author's local record. CI runs the checks again and uploads its own evidence, so the two are independent and do not match. The result:
 
 ```json
-{"schema": 1, "baseline": {"spec.md": "sha256:<resulting root digest>"}, "packet_sha256": "sha256:<packet digest>", "evidence": ["<local verify evidence reference>"]}
+{"schema": 1, "baseline": {"spec.md": "sha256:<resulting root digest>"}, "packet_sha256": "sha256:<packet digest>", "tree_sha256": "sha256:<verified tree digest>", "evidence": ["<local verify evidence reference>"]}
 ```
 
 Rerunning `close` after a fix rewrites the file with fresh evidence. See Lifecycle for when to add the closure and which evidence it may cite.
 
 `baseline` lists exactly the root artifacts the packet carries. `packet_sha256` covers the packet without `closure.json`. The closure never names a commit.
 
-A pull request can only validate a **candidate** closure: approvals current, deltas merged, digests matching the candidate tree, and evidence present. After merge, the **authoritative anchor** is derived from the baseline branch's first-parent history. It is the newest first-parent commit that introduces the `closure.json` on the branch tip: its tree has the file and its first parent's does not. That is the squash commit (the recommended default), the merge commit, or the rebased commit that adds the file.
+A pull request can only validate a **candidate** closure: approvals current, deltas merged, digests matching the candidate tree, and evidence present. After merge, the **authoritative anchor** is derived from the baseline branch's first-parent history. It is the newest first-parent commit that introduces the `closure.json` on the branch tip: its tree has the file and its first parent's does not. That is the squash commit (the recommended default) or the merge commit. Rebase merges are not supported: after a closure refresh, the first closure commit becomes the anchor and the packet fails `frozen-integrity`.
 
 The change is `frozen` once its digests verify at that anchor. From then on, any byte difference under `changes/<id>/` relative to the anchor is an integrity failure. Later root baseline changes do not stale a frozen change, because it was verified at its own anchor.
 
-A closed packet stays on the baseline branch. Removing its `closure.json` or the whole packet fails `status`, so a pull request cannot do it, and that includes a plain `git revert` of the closing squash commit. To undo a merged change, open a new change that restores the files. The only exception is removing the template's packets in the Quick start, which commits to the baseline branch before it is protected.
+A closed packet stays on the baseline branch. Removing its `closure.json` or the whole packet fails `status`, so a pull request cannot do it, and that includes a plain `git revert` of the closing squash commit. To undo a merged change, open a new change that restores the files, and write that in the plan's rollback section, not "revert". If the undone change altered the baseline, use a kind that carries the restored `spec.md` or `intent.md` for approval. The only exception is removing the template's packets in the Quick start, which commits to the baseline branch before it is protected.
 
 Shallow history cannot establish anchors or bases, so it blocks. CI fetches full history.
