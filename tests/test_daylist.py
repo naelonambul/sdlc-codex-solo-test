@@ -8,6 +8,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from datetime import date
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,6 +55,31 @@ class DaylistCliTests(unittest.TestCase):
             text=True,
         )
 
+    def invoke_list_at_date(self, today: date) -> tuple[int, str]:
+        class FixedDate(date):
+            @classmethod
+            def today(cls) -> FixedDate:
+                return cls(today.year, today.month, today.day)
+
+        output = StringIO()
+        with patch.object(daylist, "date", FixedDate), redirect_stdout(output):
+            result = daylist.main(["--data-file", str(self.data_file), "list"])
+        return result, output.getvalue()
+
+    def write_v1_file(self) -> bytes:
+        self.data_file.parent.mkdir(parents=True, exist_ok=True)
+        document = {
+            "version": 1,
+            "next_id": 3,
+            "tasks": [
+                {"id": 1, "text": "Legacy open", "completed": False},
+                {"id": 2, "text": "Legacy done", "completed": True},
+            ],
+        }
+        content = (json.dumps(document, indent=2) + "\n").encode("utf-8")
+        self.data_file.write_bytes(content)
+        return content
+
     def test_help_lists_commands_without_creating_data(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--data-file", str(self.data_file), "--help"],
@@ -66,6 +94,12 @@ class DaylistCliTests(unittest.TestCase):
         self.assertIn("done", result.stdout)
         self.assertIn("remove", result.stdout)
         self.assertIn("--data-file", result.stdout)
+        self.assertFalse(self.data_file.exists())
+
+    def test_add_help_shows_due_option_without_creating_data(self) -> None:
+        result = self.invoke("add", "--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("--due YYYY-MM-DD", result.stdout)
         self.assertFalse(self.data_file.exists())
 
     def test_list_of_missing_file_does_not_create_it(self) -> None:
@@ -103,8 +137,198 @@ class DaylistCliTests(unittest.TestCase):
         )
 
         document = json.loads(self.data_file.read_text(encoding="utf-8"))
-        self.assertEqual(document["version"], 1)
+        self.assertEqual(document["version"], 2)
         self.assertEqual(document["next_id"], 4)
+        self.assertEqual([task["due_date"] for task in document["tasks"]], [None, None])
+
+    def test_add_due_date_is_persisted_and_listed(self) -> None:
+        dated = self.invoke("add", "Submit report", "--due", "2026-11-05")
+        undated = self.invoke("add", "Buy tea")
+
+        self.assertEqual(dated.returncode, 0)
+        self.assertEqual(undated.returncode, 0)
+        listed_code, listed_output = self.invoke_list_at_date(date(2026, 11, 4))
+        self.assertEqual(listed_code, 0)
+        self.assertEqual(
+            listed_output,
+            "[ ] 1 Submit report (due 2026-11-05)\n[ ] 2 Buy tea\n",
+        )
+        document = json.loads(self.data_file.read_text(encoding="utf-8"))
+        self.assertEqual(document["version"], 2)
+        self.assertEqual(
+            [task["due_date"] for task in document["tasks"]],
+            ["2026-11-05", None],
+        )
+        self.assertEqual(self.invoke("done", "1").returncode, 0)
+        completed_code, completed_output = self.invoke_list_at_date(date(2026, 11, 4))
+        self.assertEqual(completed_code, 0)
+        self.assertEqual(
+            completed_output,
+            "[x] 1 Submit report (due 2026-11-05)\n[ ] 2 Buy tea\n",
+        )
+        self.assertEqual(self.invoke("remove", "2").returncode, 0)
+        document = json.loads(self.data_file.read_text(encoding="utf-8"))
+        self.assertEqual(document["tasks"][0]["due_date"], "2026-11-05")
+
+    def test_list_marks_only_incomplete_past_due_tasks_overdue(self) -> None:
+        document = {
+            "version": 2,
+            "next_id": 5,
+            "tasks": [
+                {
+                    "id": 1,
+                    "text": "Past open",
+                    "completed": False,
+                    "due_date": "2026-10-30",
+                },
+                {
+                    "id": 2,
+                    "text": "Due today",
+                    "completed": False,
+                    "due_date": "2026-10-31",
+                },
+                {
+                    "id": 3,
+                    "text": "Due tomorrow",
+                    "completed": False,
+                    "due_date": "2026-11-01",
+                },
+                {
+                    "id": 4,
+                    "text": "Past complete",
+                    "completed": True,
+                    "due_date": "2026-10-30",
+                },
+            ],
+        }
+        self.data_file.parent.mkdir(parents=True, exist_ok=True)
+        self.data_file.write_text(json.dumps(document), encoding="utf-8")
+
+        result, output = self.invoke_list_at_date(date(2026, 10, 31))
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            output,
+            "[ ] 1 Past open (overdue 2026-10-30)\n"
+            "[ ] 2 Due today (due 2026-10-31)\n"
+            "[ ] 3 Due tomorrow (due 2026-11-01)\n"
+            "[x] 4 Past complete (due 2026-10-30)\n",
+        )
+
+    def test_due_date_requires_a_real_canonical_calendar_date(self) -> None:
+        valid_leap_day = self.invoke("add", "Leap day", "--due", "2024-02-29")
+        self.assertEqual(valid_leap_day.returncode, 0)
+        original = self.data_file.read_bytes()
+
+        for value in ("2023-02-29", "2026-13-01", "2026-1-01", "not-a-date"):
+            with self.subTest(value=value):
+                result = self.invoke("add", "Invalid date", "--due", value)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("YYYY-MM-DD", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(self.data_file.read_bytes(), original)
+
+    def test_version_one_list_does_not_rewrite_file(self) -> None:
+        original = self.write_v1_file()
+
+        result = self.invoke("list")
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(
+            result.stdout,
+            "[ ] 1 Legacy open\n[x] 2 Legacy done\n",
+        )
+        self.assertEqual(self.data_file.read_bytes(), original)
+
+    def test_state_changing_commands_migrate_version_one_to_version_two(self) -> None:
+        operations = (
+            (
+                ("add", "New task"),
+                4,
+                [1, 2, 3],
+                ["Legacy open", "Legacy done", "New task"],
+                [False, True, False],
+            ),
+            (
+                ("done", "1"),
+                3,
+                [1, 2],
+                ["Legacy open", "Legacy done"],
+                [True, True],
+            ),
+            (
+                ("remove", "1"),
+                3,
+                [2],
+                ["Legacy done"],
+                [True],
+            ),
+        )
+        for arguments, next_id, task_ids, texts, completed in operations:
+            with self.subTest(arguments=arguments):
+                self.write_v1_file()
+
+                result = self.invoke(*arguments)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                document = json.loads(self.data_file.read_text(encoding="utf-8"))
+                self.assertEqual(document["version"], 2)
+                self.assertEqual(document["next_id"], next_id)
+                self.assertEqual([task["id"] for task in document["tasks"]], task_ids)
+                self.assertEqual([task["text"] for task in document["tasks"]], texts)
+                self.assertEqual(
+                    [task["completed"] for task in document["tasks"]], completed
+                )
+                self.assertTrue(all("due_date" in task for task in document["tasks"]))
+                self.assertEqual(
+                    [task["due_date"] for task in document["tasks"]],
+                    [None] * len(task_ids),
+                )
+
+    def test_repeated_done_does_not_migrate_version_one_file(self) -> None:
+        original = self.write_v1_file()
+
+        result = self.invoke("done", "2")
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "Task 2 is already complete.\n")
+        self.assertEqual(self.data_file.read_bytes(), original)
+
+    def test_invalid_version_two_due_dates_are_preserved(self) -> None:
+        invalid_documents = [
+            {
+                "version": 2,
+                "next_id": 2,
+                "tasks": [
+                    {
+                        "id": 1,
+                        "text": "Invalid date",
+                        "completed": False,
+                        "due_date": invalid_due_date,
+                    }
+                ],
+            }
+            for invalid_due_date in ("2023-02-29", "2026-1-01", 1, True)
+        ]
+        invalid_documents.append(
+            {
+                "version": 2,
+                "next_id": 2,
+                "tasks": [{"id": 1, "text": "Missing date", "completed": False}],
+            }
+        )
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.data_file.parent.mkdir(parents=True, exist_ok=True)
+                content = (json.dumps(document, indent=2) + "\n").encode("utf-8")
+                self.data_file.write_bytes(content)
+
+                result = self.invoke("list")
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(str(self.data_file), result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(self.data_file.read_bytes(), content)
 
     def test_data_file_override_keeps_lists_separate(self) -> None:
         alternate = self.directory / "alternate.json"
@@ -155,7 +379,7 @@ class DaylistCliTests(unittest.TestCase):
             self.assertEqual(self.data_file.read_bytes(), original)
 
     def test_malformed_or_unsupported_data_is_preserved(self) -> None:
-        for content in (b"{broken", b'{"version": 2, "next_id": 1, "tasks": []}'):
+        for content in (b"{broken", b'{"version": 3, "next_id": 1, "tasks": []}'):
             with self.subTest(content=content):
                 self.data_file.parent.mkdir(parents=True, exist_ok=True)
                 self.data_file.write_bytes(content)
@@ -166,10 +390,9 @@ class DaylistCliTests(unittest.TestCase):
                 self.assertEqual(self.data_file.read_bytes(), content)
 
     def test_write_failure_keeps_existing_file_and_removes_temporary_file(self) -> None:
-        self.data_file.parent.mkdir(parents=True)
-        self.data_file.write_text("previous content\n", encoding="utf-8")
-        original = self.data_file.read_bytes()
-        store = daylist.Store(next_id=2, tasks=[daylist.Task(1, "New content", False)])
+        original = self.write_v1_file()
+        store = daylist.load_store(self.data_file)
+        store.tasks[0].completed = True
         with patch(
             "daylist.os.replace", side_effect=OSError("simulated replace failure")
         ):

@@ -6,7 +6,7 @@ People who spend time in a terminal need a quick way to remember and manage a sh
 
 ## Proposed outcome
 
-Daylist is a small command-line checklist for one person. It lets someone add tasks, review their status, mark tasks complete, and remove tasks. The list persists between runs in a local file, with a simple way to select another file for backup or a separate list.
+Daylist is a small command-line checklist for one person. It lets someone add tasks, review their status, mark tasks complete, and remove tasks. A task may have an optional due date that appears in the list. The list persists between runs in a local file, with a simple way to select another file for backup or a separate list.
 
 ## Affected users and systems
 
@@ -23,12 +23,13 @@ Daylist is a small command-line checklist for one person. It lets someone add ta
 ## Out of scope
 
 - Multi-user lists, synchronization, accounts, or network services.
-- Reminders, due dates, recurring tasks, priorities, or project management features.
+- Reminders, recurring tasks, priorities, or project management features.
 - A graphical interface.
 
 ## Success criteria
 
 - A user can add a task, list tasks with clear identifiers and completion status, mark a task complete, and remove a task from the terminal.
+- A user can give a task an optional due date and see it when listing tasks.
 - Task identifiers remain usable across runs, and saved tasks persist between invocations.
 - A user can choose an alternate data file without changing the default list.
 - The tool explains its commands through built-in help and gives clear errors for invalid input or unknown task identifiers.
