@@ -16,7 +16,7 @@ python3 daylist.py done 1
 python3 daylist.py remove 1
 ```
 
-Use the optional `--due YYYY-MM-DD` argument when adding a task to set its calendar due date. `list` appends `(due YYYY-MM-DD)` to dated tasks. Existing version 1 data files remain readable and are written as version 2 on the next successful state-changing command.
+Use the optional `--due YYYY-MM-DD` argument when adding a task to set its calendar due date. `list` appends `(overdue YYYY-MM-DD)` when an incomplete task's due date is before the local calendar date. Tasks due today or later, and completed tasks with a due date, show `(due YYYY-MM-DD)`. For example, an incomplete task due yesterday appears as `[ ] 1 Submit report (overdue 2026-10-30)`, while a completed task with that date appears as `[x] 2 Submit report (due 2026-10-30)`. Existing version 1 data files remain readable and are written as version 2 on the next successful state-changing command.
 
 Choose another list by placing `--data-file PATH` before the command, such as `python3 daylist.py --data-file ./work.json list`. The path can be relative to the current directory or start with `~`. IDs increase monotonically and are not reused after removal; repeating `done ID` succeeds without changing the task. Daylist runs offline and supports one process at a time writing a given file.
 

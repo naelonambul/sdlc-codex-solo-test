@@ -226,9 +226,15 @@ def run(args: argparse.Namespace) -> int:
         if not store.tasks:
             print("No tasks.")
             return 0
+        today = date.today()
         for task in store.tasks:
             marker = "x" if task.completed else " "
-            due_suffix = f" (due {task.due_date})" if task.due_date is not None else ""
+            if task.due_date is None:
+                due_suffix = ""
+            elif not task.completed and date.fromisoformat(task.due_date) < today:
+                due_suffix = f" (overdue {task.due_date})"
+            else:
+                due_suffix = f" (due {task.due_date})"
             print(f"[{marker}] {task.id} {task.text}{due_suffix}")
         return 0
 

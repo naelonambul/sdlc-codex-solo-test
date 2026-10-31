@@ -8,6 +8,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from datetime import date
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -51,6 +54,17 @@ class DaylistCliTests(unittest.TestCase):
             env=environment,
             text=True,
         )
+
+    def invoke_list_at_date(self, today: date) -> tuple[int, str]:
+        class FixedDate(date):
+            @classmethod
+            def today(cls) -> FixedDate:
+                return cls(today.year, today.month, today.day)
+
+        output = StringIO()
+        with patch.object(daylist, "date", FixedDate), redirect_stdout(output):
+            result = daylist.main(["--data-file", str(self.data_file), "list"])
+        return result, output.getvalue()
 
     def write_v1_file(self) -> bytes:
         self.data_file.parent.mkdir(parents=True, exist_ok=True)
@@ -133,8 +147,10 @@ class DaylistCliTests(unittest.TestCase):
 
         self.assertEqual(dated.returncode, 0)
         self.assertEqual(undated.returncode, 0)
+        listed_code, listed_output = self.invoke_list_at_date(date(2026, 11, 4))
+        self.assertEqual(listed_code, 0)
         self.assertEqual(
-            self.invoke("list").stdout,
+            listed_output,
             "[ ] 1 Submit report (due 2026-11-05)\n[ ] 2 Buy tea\n",
         )
         document = json.loads(self.data_file.read_text(encoding="utf-8"))
@@ -144,13 +160,60 @@ class DaylistCliTests(unittest.TestCase):
             ["2026-11-05", None],
         )
         self.assertEqual(self.invoke("done", "1").returncode, 0)
+        completed_code, completed_output = self.invoke_list_at_date(date(2026, 11, 4))
+        self.assertEqual(completed_code, 0)
         self.assertEqual(
-            self.invoke("list").stdout,
+            completed_output,
             "[x] 1 Submit report (due 2026-11-05)\n[ ] 2 Buy tea\n",
         )
         self.assertEqual(self.invoke("remove", "2").returncode, 0)
         document = json.loads(self.data_file.read_text(encoding="utf-8"))
         self.assertEqual(document["tasks"][0]["due_date"], "2026-11-05")
+
+    def test_list_marks_only_incomplete_past_due_tasks_overdue(self) -> None:
+        document = {
+            "version": 2,
+            "next_id": 5,
+            "tasks": [
+                {
+                    "id": 1,
+                    "text": "Past open",
+                    "completed": False,
+                    "due_date": "2026-10-30",
+                },
+                {
+                    "id": 2,
+                    "text": "Due today",
+                    "completed": False,
+                    "due_date": "2026-10-31",
+                },
+                {
+                    "id": 3,
+                    "text": "Due tomorrow",
+                    "completed": False,
+                    "due_date": "2026-11-01",
+                },
+                {
+                    "id": 4,
+                    "text": "Past complete",
+                    "completed": True,
+                    "due_date": "2026-10-30",
+                },
+            ],
+        }
+        self.data_file.parent.mkdir(parents=True, exist_ok=True)
+        self.data_file.write_text(json.dumps(document), encoding="utf-8")
+
+        result, output = self.invoke_list_at_date(date(2026, 10, 31))
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            output,
+            "[ ] 1 Past open (overdue 2026-10-30)\n"
+            "[ ] 2 Due today (due 2026-10-31)\n"
+            "[ ] 3 Due tomorrow (due 2026-11-01)\n"
+            "[x] 4 Past complete (due 2026-10-30)\n",
+        )
 
     def test_due_date_requires_a_real_canonical_calendar_date(self) -> None:
         valid_leap_day = self.invoke("add", "Leap day", "--due", "2024-02-29")

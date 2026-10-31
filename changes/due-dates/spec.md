@@ -2,7 +2,7 @@
 
 ## Summary
 
-Daylist is a local, single-user task checklist invoked from the terminal with Python 3.9 or newer. It stores tasks in a JSON file and supports adding, listing, completing, and removing tasks. A task may have an optional calendar due date. The data format is version 2, and valid version 1 files remain usable and migrate on their next successful write.
+Daylist is a local, single-user task checklist invoked from the terminal with Python 3.9 or newer. It stores tasks in a JSON file and supports adding, listing, completing, and removing tasks. A task may have an optional calendar due date; incomplete tasks with past due dates are marked overdue in the list. The data format is version 2, and valid version 1 files remain usable and migrate on their next successful write.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Daylist is a local, single-user task checklist invoked from the terminal with Py
 - Use `~/.daylist/tasks.json` when `--data-file` is omitted.
 - For `add`, trim whitespace from the beginning and end of `TEXT`, reject an empty result, allocate a positive integer ID, and save the task as incomplete. IDs increase monotonically and are never reused after removal.
 - For `add`, accept an optional `--due` after `TEXT`. Its value must be a real calendar date in exactly `YYYY-MM-DD` form. Reject malformed or impossible dates without changing the data file. If omitted, the task has no due date.
-- For `list`, show all tasks in ascending ID order, including completed tasks. Show each ID, a clear incomplete or complete marker, and the task text. If a task has a due date, append ` (due YYYY-MM-DD)` to its line. If it has no due date, keep the existing line format. If no data file exists or the list is empty, print `No tasks.` without creating a file.
+- For `list`, show all tasks in ascending ID order, including completed tasks. Show each ID, a clear incomplete or complete marker, and the task text. If an incomplete task has a due date earlier than the invoking machine's current local calendar date, append ` (overdue YYYY-MM-DD)` to its line. For all other dated tasks, including completed tasks whose due date has passed, append ` (due YYYY-MM-DD)`. If a task has no due date, keep the existing line format. If no data file exists or the list is empty, print `No tasks.` without creating a file.
 - For `done ID`, mark the matching task complete. Repeating the command for an already completed task succeeds without changing its state or writing the file. An unknown ID is an error and does not change the file.
 - For `remove ID`, remove the matching task. An unknown ID is an error and does not change the file.
 - Create the default data directory and file when the first task is added. Do not create or rewrite the data file for read-only commands or failed mutations.
@@ -35,7 +35,7 @@ Daylist is a local, single-user task checklist invoked from the terminal with Py
 - `TEXT` is one shell argument; users quote text containing spaces, for example `python3 daylist.py add "Buy tea"`.
 - `--data-file` is a global option and appears before the command, for example `python3 daylist.py --data-file ./work.json list`.
 - Successful `add`, `done`, and `remove` commands report the affected ID. `done` on an already completed task reports that it is already complete and exits successfully.
-- `list` uses `[ ]` for incomplete tasks and `[x]` for completed tasks, preserving task text as entered apart from trimming its outer whitespace. For example, a task with a due date is displayed as `[ ] 1 Submit report (due 2026-11-05)`.
+- `list` uses `[ ]` for incomplete tasks and `[x]` for completed tasks, preserving task text as entered apart from trimming its outer whitespace. For example, an incomplete task due yesterday is displayed as `[ ] 1 Submit report (overdue 2026-10-30)`, while a completed task with that same due date is displayed as `[x] 2 Submit report (due 2026-10-30)`.
 - Invalid command syntax uses the argument parser's help and error behavior. Invalid IDs, unknown tasks, inaccessible paths, malformed JSON, invalid due dates, and unsupported data versions produce a concise error.
 
 ## Architecture and design
@@ -90,7 +90,7 @@ There are no runtime dependencies outside Python's standard library. Development
 ## Acceptance criteria
 
 - Help shows the four commands, the global data-file option, and the add command's due-date option without reading or creating a data file.
-- With an isolated data-file path, a user can add tasks with and without due dates, list them with stable IDs and correct states, complete one, and remove another. Listing shows each due date and leaves lines for undated tasks in the existing format.
+- With an isolated data-file path, a user can add tasks with and without due dates, list them with stable IDs and correct states, complete one, and remove another. Listing marks an incomplete task overdue only when its due date is before the invoking machine's local calendar date; a task due today or later shows `(due YYYY-MM-DD)`. Completed tasks always show `(due YYYY-MM-DD)`, even when the date is past. Undated tasks keep the existing line format.
 - Valid dates are accepted, including leap-day dates when valid for that year. Malformed dates and impossible calendar dates fail without changing or creating the data file.
 - A valid version 1 file can be listed without modification. Its tasks show no due date. The next successful state-changing mutation writes version 2, preserves IDs, text, completion state, and `next_id`, and gives undated tasks `due_date: null`.
 - Repeating `done ID` for an already completed task succeeds without modifying a version 1 file. A later successful mutation migrates it to version 2.
