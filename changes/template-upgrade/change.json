@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "template-upgrade",
+  "kind": "repository",
+  "title": "Update the control plane from the template at 184b5ef",
+  "base": {
+    "ref": "main",
+    "commit": "7a0d63507d81ae674236073f2996a3bea4780cb2"
+  },
+  "baseline": {},
+  "write_scope": [
+    ".agents/skills/repository-quality/SKILL.md",
+    ".agents/skills/sdlc-artifacts/SKILL.md",
+    ".agents/skills/verification-map/SKILL.md",
+    ".agents/skills/verification-map/references/platforms.md",
+    "AGENTS.md",
+    "changes/README.md",
+    "docs/agent-surfaces.md",
+    "docs/host-setup.md",
+    "scripts/repo.py",
+    "scripts/tests/__init__.py",
+    "scripts/tests/support.py",
+    "scripts/tests/test_approve_close.py",
+    "scripts/tests/test_status.py",
+    "scripts/tests/test_verify.py"
+  ],
+  "approvals": [
+    {
+      "artifact": "plan.md",
+      "sha256": "sha256:6618de04b658150948af6dacefafe85a0db15c591cf4ab9f0195f051e07d874f",
+      "by": "naelonambul",
+      "at": "2026-10-31T01:31:30Z",
+      "write_scope_sha256": "sha256:6a9f8c3fbf7c89aab0b1b6eb9dbce340dfa61f063603e8173e64e3ea6d00e5b9",
+      "note": "Owner delegated test-repo approval to the supervising agent in chat; setup step for the short second test"
+    }
+  ]
+}

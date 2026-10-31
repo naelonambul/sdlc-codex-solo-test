@@ -1,6 +1,8 @@
 """Fixtures for `repo.py verify`: routing, statuses, evidence."""
 
 import json
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -119,6 +121,46 @@ class Verify(RepoCase):
         self.write("src/a.txt", "x\n")
         self.assertFalse(self.verify()["complete"])
 
+    def test_files_changed_during_the_run_fail_it(self):
+        self.configure(check("src", code="open('src/made.txt', 'w').write('x')"))
+        self.write("src/a.txt", "x\n")
+        proc = self.run_repo("verify", "--full")
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("files changed during the run", proc.stdout)
+
+    def test_a_partial_group_run_still_exits_zero(self):
+        self.configure(check("src"), check("web", group="web"))
+        self.write("src/a.txt", "x\n")
+        self.assertEqual(self.run_repo("verify", "--group", "core").returncode, 0)
+
+    def test_digest_binds_a_submodule_commit(self):
+        sys.path.insert(0, str(REPO_PY.parent))
+        import repo  # noqa: E402
+
+        self.configure(check("src"))
+        head = self.git("rev-parse", "HEAD")
+        (self.root / "sub").mkdir()
+        self.git("update-index", "--add", "--cacheinfo", f"160000,{head},sub")
+        first = repo.candidate_digest(self.root, None)
+        self.git("update-index", "--cacheinfo", f"160000,{'1' * 40},sub")
+        self.assertNotEqual(repo.candidate_digest(self.root, None), first)
+
+    def test_malformed_config_blocks(self):
+        self.write("checks.json", "{bad")
+        proc = self.run_repo("verify", "--full")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("blocked", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
+    def test_a_non_executable_check_is_blocked_with_evidence(self):
+        self.write("c.sh", "#!/bin/sh\n")
+        self.configure({**check("src"), "argv": ["./c.sh"]})
+        self.write("src/a.txt", "x\n")
+        result = self.verify("--full")
+        self.assertEqual(result["exit"], 1, result["stderr"])
+        self.assertEqual(result["by_id"]["src"]["status"], "blocked")
+        self.assertNotIn("Traceback", result["stderr"])
+
     def test_printed_evidence_path_is_relative(self):
         self.configure(check("src"))
         self.write("src/a.txt", "x\n")
@@ -144,6 +186,15 @@ class Verify(RepoCase):
             record = repo.run_check(ctx, check("src"), self.root.parent / "ev" / "src.log")
         self.assertEqual(record["status"], "blocked")
         self.assertIn("evidence log is missing", record["reason"])
+
+
+class FixtureIsolation(unittest.TestCase):
+    def test_importing_the_test_package_drops_repository_locating_git_variables(self):
+        code = "import os, scripts.tests; print(sorted({'GIT_DIR', 'GIT_WORK_TREE'} & set(os.environ)))"
+        env = {**os.environ, "GIT_DIR": "/nonexistent/git", "GIT_WORK_TREE": "/nonexistent/tree"}
+        proc = subprocess.run([PY, "-c", code], cwd=REPO_PY.parents[1], env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.strip(), "[]")
 
 
 if __name__ == "__main__":
