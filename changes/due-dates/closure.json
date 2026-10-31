@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "baseline": {
+    "intent.md": "sha256:573935c6d290dee371918db91330fa14c430fc93071f91f7210b8cce2f381ce4",
+    "spec.md": "sha256:11928514e7e2960179b29a7af9ecbc8572d4489c1dfb59b94121c25088fd231a"
+  },
+  "packet_sha256": "sha256:58a96888c48adcf594e76900bd367e7f807a1143f8d6c4942c00e7de16276d28",
+  "tree_sha256": "sha256:cb1d5880ec978bf94373b342116eaecddb095be7fa79c22721a93a6c6d53bd9e",
+  "evidence": [
+    ".evidence/20261031T014333441444Z/evidence.json sha256:119bf769f7be23e3e48496849ab79ce2bd5ce3659a264c4c11632cade6145fc4"
+  ]
+}

@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import NoReturn
 
@@ -17,6 +18,7 @@ class Task:
     id: int
     text: str
     completed: bool
+    due_date: str | None = None
 
 
 @dataclass
@@ -40,6 +42,23 @@ def positive_id(value: str) -> int:
     return task_id
 
 
+def is_valid_date(value: str) -> bool:
+    """Return whether value is a real date in canonical YYYY-MM-DD form."""
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
+def iso_date(value: str) -> str:
+    """Parse an ISO calendar date for argparse."""
+    if not is_valid_date(value):
+        raise argparse.ArgumentTypeError(
+            "DATE must be a valid date in YYYY-MM-DD format"
+        )
+    return value
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Manage a local task list.")
     result.add_argument(
@@ -51,6 +70,12 @@ def parser() -> argparse.ArgumentParser:
 
     add_command = commands.add_parser("add", help="add a task")
     add_command.add_argument("text", metavar="TEXT", help="task text")
+    add_command.add_argument(
+        "--due",
+        metavar="YYYY-MM-DD",
+        type=iso_date,
+        help="optional calendar due date",
+    )
     commands.add_parser("list", help="list all tasks")
 
     done_command = commands.add_parser("done", help="mark a task complete")
@@ -79,7 +104,11 @@ def load_store(path: Path) -> Store:
     if not isinstance(document, dict):
         fail(f"invalid data in {path}: expected a JSON object")
     version = document.get("version")
-    if isinstance(version, bool) or not isinstance(version, int) or version != 1:
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version not in (1, 2)
+    ):
         fail(f"unsupported data version in {path}: {version!r}")
 
     next_id = document.get("next_id")
@@ -109,7 +138,28 @@ def load_store(path: Path) -> Store:
             fail(f"invalid data in {path}: task text must be non-empty")
         if not isinstance(completed, bool):
             fail(f"invalid data in {path}: completed must be a boolean")
-        tasks.append(Task(id=task_id, text=text, completed=completed))
+        task_due_date: str | None = None
+        if version == 2:
+            if "due_date" not in record:
+                fail(f"invalid data in {path}: version 2 tasks require due_date")
+            due_date_value = record["due_date"]
+            if due_date_value is None:
+                task_due_date = None
+            elif isinstance(due_date_value, str) and is_valid_date(due_date_value):
+                task_due_date = due_date_value
+            else:
+                fail(
+                    f"invalid data in {path}: due_date must be null or a valid "
+                    "YYYY-MM-DD date"
+                )
+        tasks.append(
+            Task(
+                id=task_id,
+                text=text,
+                completed=completed,
+                due_date=task_due_date,
+            )
+        )
         seen_ids.add(task_id)
         previous_id = task_id
 
@@ -121,10 +171,15 @@ def load_store(path: Path) -> Store:
 def save_store(path: Path, store: Store) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     document = {
-        "version": 1,
+        "version": 2,
         "next_id": store.next_id,
         "tasks": [
-            {"id": task.id, "text": task.text, "completed": task.completed}
+            {
+                "id": task.id,
+                "text": task.text,
+                "completed": task.completed,
+                "due_date": task.due_date,
+            }
             for task in store.tasks
         ],
     }
@@ -173,14 +228,20 @@ def run(args: argparse.Namespace) -> int:
             return 0
         for task in store.tasks:
             marker = "x" if task.completed else " "
-            print(f"[{marker}] {task.id} {task.text}")
+            due_suffix = f" (due {task.due_date})" if task.due_date is not None else ""
+            print(f"[{marker}] {task.id} {task.text}{due_suffix}")
         return 0
 
     if args.command == "add":
         text = args.text.strip()
         if not text:
             raise DaylistError("task text must not be empty")
-        task = Task(id=store.next_id, text=text, completed=False)
+        task = Task(
+            id=store.next_id,
+            text=text,
+            completed=False,
+            due_date=args.due,
+        )
         store.tasks.append(task)
         store.next_id += 1
         save_store(path, store)
